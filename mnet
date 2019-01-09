@@ -1,0 +1,119 @@
+import numpy as np
+import keras
+from keras import backend as K
+from keras.layers import GaussianNoise,GaussianDropout
+from keras.models import Sequential
+from keras.layers.core import Dense, Flatten
+from keras.layers import Conv2D, MaxPooling2D, Activation, Concatenate, AveragePooling2D, Dropout
+from keras.optimizers import Adam, SGD, Adadelta, RMSprop, Nadam
+from keras.metrics import categorical_crossentropy
+from keras.preprocessing.image import ImageDataGenerator
+from keras.layers.normalization import BatchNormalization
+from keras.layers.convolutional import *
+from keras.layers import Input
+from keras.models import Model
+import matplotlib.pyplot as plt
+import cv2
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+
+path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_train'
+v_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_valid'
+t_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_test'
+
+batches = ImageDataGenerator().flow_from_directory(path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+v_batches = ImageDataGenerator().flow_from_directory(v_path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+t_batches = ImageDataGenerator().flow_from_directory(t_path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=100)
+t_imgs,t_labels = next(t_batches)
+
+img_input = Input(shape=(224,224,3))
+image = BatchNormalization()(img_input)
+image = Conv2D(16, (3,3), strides=(2,2), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(32, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(32, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+
+image = SeparableConv2D(32, (3,3), activation='relu', padding='same', strides=(2,2))(image)
+image = Conv2D(64, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(64, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(64, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+
+image = SeparableConv2D(64, (3,3), activation='relu', padding='same', strides=(2,2))(image)
+image = Conv2D(128, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(128, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(128, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+
+image = SeparableConv2D(128, (3,3), activation='relu', padding='same', strides=(2,2))(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+"""
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(256, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+"""
+
+image = SeparableConv2D(256, (3,3), activation='relu', padding='same', strides=(2,2))(image)
+image = Conv2D(512, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+image = SeparableConv2D(512, (3,3), activation='relu', padding='same')(image)
+image = Conv2D(512, (1,1), activation='relu')(image)
+image = BatchNormalization()(image)
+
+image = AveragePooling2D(pool_size=(7,7))(image)
+image = BatchNormalization()(image)
+
+out = Flatten()(image)
+out = Dense(250, activation='relu')(out)
+out = Dense(100, activation='relu')(out)
+out = Dense(27, activation='softmax')(out)
+
+model = Model(img_input, out)
+print(model.summary())
+
+model.compile(RMSprop(lr=0.00001, rho=0.9, epsilon=1.0, decay=0.1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+filepath="/home/rishab/GoogleLeNet_final_start.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+callbacks_list = [checkpoint]
+
+history = model.fit_generator(batches, steps_per_epoch=2484, validation_data=v_batches, validation_steps=719, epochs=3, verbose=1, callbacks=callbacks_list)
+
+y_pred = model.predict(t_imgs,steps=1)
+score = model.evaluate(t_imgs, t_labels, verbose=1)
+print(score)
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'valid'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'valid'], loc='upper left')
+plt.show()
+
+K.clear_session()

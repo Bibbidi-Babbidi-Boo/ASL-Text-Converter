@@ -1,0 +1,173 @@
+import numpy as np
+import keras
+from keras import backend as K
+from keras.layers import GaussianNoise,GaussianDropout
+from keras.models import Sequential
+from keras.layers.core import Dense, Flatten
+from keras.layers import Conv2D, MaxPooling2D, Activation, Concatenate, AveragePooling2D, Dropout
+from keras.optimizers import Adam, SGD, Adadelta, RMSprop, Nadam
+from keras.metrics import categorical_crossentropy
+from keras.preprocessing.image import ImageDataGenerator
+from keras.layers.normalization import BatchNormalization
+from keras.layers.convolutional import *
+from keras.layers import Input
+from keras.models import Model
+import matplotlib.pyplot as plt
+import cv2
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+
+
+path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_train'
+v_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_valid'
+t_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_test'
+
+batches = ImageDataGenerator().flow_from_directory(path, target_size=(244,244), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+v_batches = ImageDataGenerator().flow_from_directory(v_path, target_size=(244,244), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+t_batches = ImageDataGenerator().flow_from_directory(t_path, target_size=(244,244), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=120)
+t_imgs,t_labels = next(t_batches)
+
+
+img_input = Input(shape=(244,244,3))
+#image = GaussianNoise(0.04)(img_input)
+image = BatchNormalization()(img_input)
+image = Conv2D(12, (3,3), strides=(2,2), activation='relu')(image)
+image = Conv2D(12, (3,3), activation='relu')(image)
+image = Conv2D(24, (3,3), strides=(1,1), activation='relu')(image)
+
+
+tower_1a = MaxPooling2D(pool_size=(3,3), strides=(2,2))(image)
+tower_1b = Conv2D(36, (3,3), strides=(2,2), activation='relu')(image)
+t_1 = keras.layers.concatenate([tower_1a,tower_1b], axis = 3)
+
+
+tower_2a = Conv2D(24, (1,1), activation='relu', padding='same')(t_1)
+tower_2a = Conv2D(36, (3,3), activation='relu')(tower_2a)
+
+tower_2b = Conv2D(24, (1,1), activation='relu', padding='same')(t_1)
+tower_2b = Conv2D(24, (7,1), activation='relu', padding='same')(tower_2b)
+tower_2b = Conv2D(24, (1,7), activation='relu', padding='same')(tower_2b)
+tower_2b = Conv2D(36, (3,3), activation='relu')(tower_2b)
+
+t_2 = keras.layers.concatenate([tower_2a,tower_2b], axis = 3)
+
+tower_3a = MaxPooling2D(pool_size=(3,3), strides=(2,2))(t_2)
+tower_3b = Conv2D(72, (3,3), strides=(2,2), activation='relu')(t_2)
+t_3 = keras.layers.concatenate([tower_3a,tower_3b], axis = 3)
+#checked
+
+tower_4a = Conv2D(36, (1,1), activation='relu', padding='same')(t_3)
+
+tower_4b = Conv2D(24, (1,1), activation='relu', padding='same')(t_3)
+tower_4b = Conv2D(36, (3,3), activation='relu', padding='same')(tower_4b)
+
+tower_4c = Conv2D(24, (1,1), activation='relu', padding='same')(t_3)
+tower_4c = Conv2D(36, (3,3), activation='relu', padding='same')(tower_4c)
+tower_4c = Conv2D(36, (3,3), activation='relu', padding='same')(tower_4c)
+
+tower_4d = AveragePooling2D(pool_size=(3,3), strides=(1,1), padding='same')(t_3)
+tower_4d = Conv2D(36, (1,1), activation='relu', padding='same')(tower_4d)
+
+t_4 = keras.layers.concatenate([tower_4a,tower_4b,tower_4c,tower_4d], axis = 3)
+
+
+tower_5a = Conv2D(144, (3,3), activation='relu', strides=(2,2))(t_4)
+
+tower_5b = Conv2D(72, (1,1), activation='relu', padding='same')(t_4)
+tower_5b = Conv2D(84, (3,3), activation='relu', padding='same')(tower_5b)
+tower_5b = Conv2D(96, (3,3), activation='relu' , strides=(2,2))(tower_5b)
+
+tower_5c = MaxPooling2D(pool_size=(3,3), strides=(2,2))(t_4)
+
+t_5 = keras.layers.concatenate([tower_5a,tower_5b,tower_5c], axis = 3)
+#checked
+
+tower_6a = Conv2D(144, (1,1), activation='relu', padding='same')(t_5)
+
+tower_6b = Conv2D(72, (1,1), activation='relu', padding='same')(t_5)
+tower_6b = Conv2D(72, (1,7), activation='relu', padding='same')(tower_6b)
+tower_6b = Conv2D(84, (7,1), activation='relu', padding='same')(tower_6b)
+tower_6b = Conv2D(84, (1,7), activation='relu', padding='same')(tower_6b)
+tower_6b = Conv2D(96, (7,1), activation='relu', padding='same')(tower_6b)
+
+tower_6c = Conv2D(72, (1,1), activation='relu', padding='same')(t_5)
+tower_6c = Conv2D(84, (1,7), activation='relu', padding='same')(tower_6c)
+tower_6c = Conv2D(96, (7,1), activation='relu', padding='same')(tower_6c)
+
+tower_6d = AveragePooling2D(pool_size=(3,3), strides=(1,1), padding='same')(t_5)
+tower_6d = Conv2D(48, (1,1), activation='relu', padding='same')(tower_6d)
+
+t_6 = keras.layers.concatenate([tower_6a,tower_6b,tower_6c,tower_6d], axis = 3)
+
+
+tower_7a = Conv2D(96, (1,1), activation='relu', padding='same')(t_6)
+tower_7a = Conv2D(96, (1,7), activation='relu', padding='same')(tower_7a)
+tower_7a = Conv2D(120, (7,1), activation='relu', padding='same')(tower_7a)
+tower_7a = Conv2D(120, (3,3), activation='relu' , strides=(2,2))(tower_7a)
+
+tower_7b = Conv2D(72, (1,1), activation='relu', padding='same')(t_6)
+tower_7b = Conv2D(72, (3,3), activation='relu' , strides=(2,2))(tower_7b)
+
+tower_7c = MaxPooling2D(pool_size=(3,3), strides=(2,2))(t_6)
+
+t_7 = keras.layers.concatenate([tower_7a,tower_7b,tower_7c], axis = 3)
+
+
+tower_8a = Conv2D(48, (1,1), activation='relu', padding='same')(t_7)
+
+tower_8b = Conv2D(72, (1,1), activation='relu', padding='same')(t_7)
+tower_8b = Conv2D(84, (1,3), activation='relu', padding='same')(tower_8b)
+tower_8b = Conv2D(96, (3,1), activation='relu', padding='same')(tower_8b)
+tower_8b1 = Conv2D(48, (1,3), activation='relu', padding='same')(tower_8b)
+tower_8b2 = Conv2D(48, (3,1), activation='relu', padding='same')(tower_8b)
+
+tower_8c = Conv2D(72, (1,1), activation='relu', padding='same')(t_7)
+tower_8c1 = Conv2D(48, (1,3), activation='relu', padding='same')(tower_8c)
+tower_8c2 = Conv2D(48, (3,1), activation='relu', padding='same')(tower_8c)
+
+tower_8d = AveragePooling2D(pool_size=(3,3), strides=(1,1), padding='same')(t_7)
+tower_8d = Conv2D(48, (1,1), activation='relu', padding='same')(tower_8d)
+
+t_8 = keras.layers.concatenate([tower_8a,tower_8b1,tower_8b2,tower_8c1,tower_8c2,tower_8d], axis = 3)
+
+t_8 = AveragePooling2D((4,4))(t_8)
+
+out = Flatten()(t_8)
+out = Dropout(0.5)(out)
+out = Dense(256, activation='relu')(out)
+out = Dense(100, activation='relu')(out)
+out = Dense(27, activation='softmax')(out)
+
+model = Model(img_input, out)
+print(model.summary())
+"""
+model.compile(RMSprop(lr=0.0025, rho=0.9, epsilon=1.0, decay=0.0002), loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+filepath="/home/rishab/GoogleLeNet_final_start.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+callbacks_list = [checkpoint]
+
+
+history = model.fit_generator(batches, steps_per_epoch=2484, validation_data=v_batches, validation_steps=719, epochs=10, verbose=1, callbacks=callbacks_list)
+
+y_pred = model.predict(t_imgs,steps=1)
+score = model.evaluate(t_imgs, t_labels, verbose=1)
+print(score)
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+"""
+K.clear_session()

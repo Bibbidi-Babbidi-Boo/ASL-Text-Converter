@@ -1,0 +1,216 @@
+import numpy as np
+import keras
+from keras import backend as K
+from keras.layers import GaussianNoise,Dropout
+from keras.models import Sequential
+from keras.layers.core import Dense, Flatten
+from keras.layers import SeparableConv2D, MaxPooling2D, Activation, Concatenate, AveragePooling2D, Dropout, GlobalAveragePooling2D
+from keras.optimizers import Adam, SGD, Adadelta, RMSprop, Nadam
+from keras.metrics import categorical_crossentropy
+from keras.preprocessing.image import ImageDataGenerator
+from keras.layers.normalization import BatchNormalization
+from keras.layers.convolutional import *
+from keras.layers import Input
+from keras.models import Model
+import matplotlib.pyplot as plt
+import cv2
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.preprocessing.image import save_img
+import scipy.misc
+
+path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_train'
+v_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_valid'
+t_path = '/home/rishab/IIT_M_Internship/ASL/asl_alphabet_test'
+
+batches = ImageDataGenerator().flow_from_directory(path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+v_batches = ImageDataGenerator().flow_from_directory(v_path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=32)
+t_batches = ImageDataGenerator().flow_from_directory(t_path, target_size=(224,224), classes=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','space','T','U','V','W','X','Y','Z'], shuffle=True, batch_size=250)
+t_imgs,t_labels = next(t_batches)
+
+img_input = Input(shape=(224,224,3))
+#image = GaussianNoise(0.01)(img_input)
+image = BatchNormalization()(img_input,training=True)
+image = SeparableConv2D(8, (3,3), strides=(2,2), activation='relu')(image)
+image_1 = SeparableConv2D(16, (3,3), strides=(2,2), activation='relu')(image)
+image_1 = BatchNormalization()(image_1,training=True)
+
+image_2 = SeparableConv2D(8, (1,1), activation='relu', padding='same')(image_1)
+image_3 = SeparableConv2D(16, (3,3), activation='relu', padding='same')(image_2)
+image = keras.layers.add([image_1,image_3])
+
+image_4 = SeparableConv2D(32, (3,3), strides=(2,2), activation='relu')(image)
+image_4 = BatchNormalization()(image_4,training=True)
+
+image_5 = SeparableConv2D(16, (1,1), activation='relu', padding='same')(image_4)
+image_6 = SeparableConv2D(32, (3,3), activation='relu', padding='same')(image_5)
+image_7 = keras.layers.add([image_4,image_6])
+image_7 = BatchNormalization()(image_7,training=True)
+image_8 = SeparableConv2D(16, (1,1), activation='relu', padding='same')(image_7)
+image_9 = SeparableConv2D(32, (3,3), activation='relu', padding='same')(image_8)
+image = keras.layers.add([image_7,image_9])
+
+
+tower_1a1 = SeparableConv2D(24, (1,1), activation='relu', padding='same')(image)
+tower_1a1 = SeparableConv2D(24, (3,3), activation='relu')(tower_1a1)
+
+tower_1a2 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image)
+tower_1a2 = SeparableConv2D(32, (7,1), activation='relu', padding='same')(tower_1a2)
+tower_1a2 = SeparableConv2D(40, (1,7), activation='relu', padding='same')(tower_1a2)
+tower_1a2 = SeparableConv2D(40, (3,3), activation='relu')(tower_1a2)
+t_1 = keras.layers.concatenate([tower_1a1,tower_1a2], axis = 3)
+t_1 = Dropout(0.7)(t_1)
+t_1 = BatchNormalization()(t_1,training=True)
+
+
+image_10 = SeparableConv2D(64, (3,3), strides=(2,2), activation='relu')(t_1)
+image_10 = BatchNormalization()(image_10,training=True)
+
+image_11 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image_10)
+image_12 = SeparableConv2D(64, (3,3), activation='relu', padding='same')(image_11)
+image_13 = keras.layers.add([image_10,image_12])
+image_13 = BatchNormalization()(image_13,training=True)
+image_14 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image_13)
+image_15 = SeparableConv2D(64, (3,3), activation='relu', padding='same')(image_14)
+image_16 = keras.layers.add([image_13,image_15])
+image_16 = BatchNormalization()(image_16,training=True)
+image_17 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image_16)
+image_18 = SeparableConv2D(64, (3,3), activation='relu', padding='same')(image_17)
+image_19 = keras.layers.add([image_16,image_18])
+image_19 = BatchNormalization()(image_19,training=True)
+image_20 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image_19)
+image_21 = SeparableConv2D(64, (3,3), activation='relu', padding='same')(image_20)
+image = keras.layers.add([image_19,image_21])
+
+tower_2a1 = SeparableConv2D(12, (1,1), activation='relu', padding='same')(image)
+
+tower_2a2 = SeparableConv2D(8, (1,1), activation='relu', padding='same')(image)
+tower_2a2 = SeparableConv2D(12, (3,3), activation='relu', padding='same')(tower_2a2)
+
+tower_2a3 = SeparableConv2D(8, (1,1), activation='relu', padding='same')(image)
+tower_2a3 = SeparableConv2D(12, (3,3), activation='relu', padding='same')(tower_2a3)
+tower_2a3 = SeparableConv2D(12, (3,3), activation='relu', padding='same')(tower_2a3)
+
+tower_2a4 = AveragePooling2D(pool_size=(3,3), strides=(1,1), padding='same')(image)
+tower_2a4 = SeparableConv2D(12, (1,1), activation='relu', padding='same')(tower_2a4)
+
+t_2 = keras.layers.concatenate([tower_2a1,tower_2a2,tower_2a3,tower_2a4], axis = 3)
+t_2 = Dropout(0.7)(t_2)
+t_2 = BatchNormalization()(t_2,training=True)
+
+
+image_35 = SeparableConv2D(128, (3,3), strides=(2,2), activation='relu')(t_2)
+image_35 = BatchNormalization()(image_35,training=True)
+
+image_36 = SeparableConv2D(64, (1,1), activation='relu', padding='same')(image_35)
+image_37 = SeparableConv2D(128, (3,3), activation='relu', padding='same')(image_36)
+image_38 = keras.layers.add([image_35,image_37])
+image_38 = BatchNormalization()(image_38,training=True)
+image_39 = SeparableConv2D(64, (1,1), activation='relu', padding='same')(image_38)
+image_40 = SeparableConv2D(128, (3,3), activation='relu', padding='same')(image_39)
+image_41 = keras.layers.add([image_38,image_40])
+image_41 = BatchNormalization()(image_41,training=True)
+image_42 = SeparableConv2D(64, (1,1), activation='relu', padding='same')(image_41)
+image_43 = SeparableConv2D(128, (3,3), activation='relu', padding='same')(image_42)
+image_44 = keras.layers.add([image_41,image_43])
+image_44 = BatchNormalization()(image_44,training=True)
+image_45 = SeparableConv2D(64, (1,1), activation='relu', padding='same')(image_44)
+image_46 = SeparableConv2D(128, (3,3), activation='relu', padding='same')(image_45)
+image = keras.layers.add([image_44,image_46])
+
+
+
+tower_3a1 = SeparableConv2D(22, (1,1), activation='relu', padding='same')(image)
+
+tower_3a2 = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image)
+tower_3a2 = SeparableConv2D(43, (3,3), activation='relu', padding='same')(tower_3a2)
+
+tower_3a3 = SeparableConv2D(6, (1,1), activation='relu', padding='same')(image)
+tower_3a3 = SeparableConv2D(11, (5,5), activation='relu', padding='same')(tower_3a3)
+
+tower_3a4 = MaxPooling2D(pool_size=(3,3), strides=(1,1), padding='same',)(image)
+tower_3a4 = SeparableConv2D(11, (1,1), activation='relu', padding='same')(tower_3a4)
+
+t_3 = keras.layers.concatenate([tower_3a1,tower_3a2,tower_3a3,tower_3a4], axis = 3)
+t_3 = Dropout(0.7)(t_3)
+t_3 = BatchNormalization()(t_3,training=True)
+
+
+
+image_59 = SeparableConv2D(256, (3,3), strides=(2,2), activation='relu')(t_3)
+image_59 = BatchNormalization()(image_59,training=True)
+
+image_60 = SeparableConv2D(128, (1,1), activation='relu', padding='same')(image_59)
+image_61 = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image_60)
+image_62 = keras.layers.add([image_59,image_61])
+image_62 = BatchNormalization()(image_62,training=True)
+image_63 = SeparableConv2D(128, (1,1), activation='relu', padding='same')(image_62)
+image_64 = SeparableConv2D(256, (3,3), activation='relu', padding='same')(image_63)
+image_65 = keras.layers.add([image_62,image_64])
+image = BatchNormalization()(image_65,training=True)
+
+
+
+
+tower_6a = SeparableConv2D(32, (1,1), activation='relu', padding='same')(image)
+
+tower_6b = SeparableConv2D(46, (1,1), activation='relu', padding='same')(image)
+tower_6b = SeparableConv2D(56, (1,7), activation='relu', padding='same')(tower_6b)
+tower_6b = SeparableConv2D(64, (7,1), activation='relu', padding='same')(tower_6b)
+tower_6b1 = SeparableConv2D(32, (1,7), activation='relu', padding='same')(tower_6b)
+tower_6b2 = SeparableConv2D(32, (7,1), activation='relu', padding='same')(tower_6b)
+
+tower_6c = SeparableConv2D(48, (1,1), activation='relu', padding='same')(image)
+tower_6c1 = SeparableConv2D(32, (1,7), activation='relu', padding='same')(tower_6c)
+tower_6c2 = SeparableConv2D(32, (7,1), activation='relu', padding='same')(tower_6c)
+
+tower_6d = AveragePooling2D(pool_size=(3,3), strides=(1,1), padding='same')(image)
+tower_6d = SeparableConv2D(32, (1,1), activation='relu', padding='same')(tower_6d)
+
+t_6 = keras.layers.concatenate([tower_6a,tower_6b1,tower_6b2,tower_6c1,tower_6c2,tower_6d], axis = 3)
+t_6 = Dropout(0.7)(t_6)
+t_6 = BatchNormalization()(t_6,training=True)
+
+
+
+
+out = GlobalAveragePooling2D(data_format='channels_last')(t_6)
+out = Dense(100, activation='relu',kernel_regularizer=regularizers.l2(0.05))(out)
+out = Dropout(0.8)(out)
+out = Dense(27, activation='softmax',kernel_regularizer=regularizers.l2(0.05))(out)
+
+model = Model(img_input, out)
+print(model.summary())
+
+model.compile(Adam(lr=1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
+
+filepath="/home/rishab/yolo_v3_2.hdf5"
+model.load_weights('/home/rishab/yolo_v3_2.hdf5')
+checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+callbacks_list = [EarlyStopping(monitor='val_acc', patience=4, verbose=1),ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')]
+
+history = model.fit_generator(batches, steps_per_epoch=2483, validation_data=v_batches, validation_steps=719, epochs=5, verbose=1, callbacks=callbacks_list)
+
+
+K.set_learning_phase(0)
+y_pred = model.predict(t_imgs,steps=1)
+score = model.evaluate(t_imgs, t_labels, verbose=1)
+print(score)
+print(model.metrics_names)
+
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('model accuracy no inception')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train','valid'], loc='upper left')
+plt.show()
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss no inception')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train','valid'], loc='upper left')
+plt.show()
+
+K.clear_session()

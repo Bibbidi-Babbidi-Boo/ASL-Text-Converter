@@ -1,4 +1,4 @@
 # ASL-Text-Converter
 
-[![Watch the video](https://i.imgur.com/vKb2F1B.png)](https://youtu.be/vt5fpE0bzSY)
+[![Watch the video](https://i.imgur.com/vKb2F1B.png)](https://drive.google.com/open?id=1jR1hv4vwx6k0GiwmdRGwRwq9Cb0NsvA9)
 

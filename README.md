@@ -8,7 +8,7 @@ A video displaying the model working in a plain background, and the masking and 
 A video showing the model working in a complex background:
 [Video for ASL Finger spelling in a complex background](https://drive.google.com/open?id=1gHykSgf7ESIyXpDeAKlczY0QtzOsvlLH "Click to play")
 
-The dataset used for the training is available here. The data is not owned by me, but found online.
+The dataset used for the training, and the weights for the model are available here is available here. The data is not owned by me, but found online.
 https://drive.google.com/open?id=1SpY6TJGOjZw3_WH_4zeaoHmjBL5HMsul
 
 Future Work:
